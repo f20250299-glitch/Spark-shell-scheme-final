@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useBuilderStore } from '../store';
-import { Box, Columns, Lightbulb, Square, Trash2, View, Download, RotateCw, LayoutGrid, Type, Wand2, Upload } from 'lucide-react';
+import { Box, Columns, Lightbulb, Square, Trash2, View, Download, RotateCw, LayoutGrid, Type, Wand2, Upload, Save, FolderOpen } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PdfCropper from './PdfCropper';
+import { HexColorPicker } from 'react-colorful';
 
 export default function Sidebar() {
   const { setPlacementMode, placementMode, addBooth, selectedItemIds, removeItem, viewMode, setViewMode, rotateSelectedItem, rotatePlacement, clearAll, generateLayout, artworks, addArtwork, removeArtwork, items, updateItem, applyArtworkToPanels } = useBuilderStore();
   const [layoutText, setLayoutText] = useState('');
   const [layoutError, setLayoutError] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [customWidth, setCustomWidth] = useState('1');
+  const [customHeight, setCustomHeight] = useState('2.4');
+  const [customDepth, setCustomDepth] = useState('3');
 
   const selectedItem = selectedItemIds.length === 1 ? items.find(i => i.id === selectedItemIds[0]) : null;
   const selectedPanels = items.filter(i => selectedItemIds.includes(i.id) && (i.type === 'sheet' || i.type === 'fascia'));
@@ -55,6 +61,44 @@ export default function Sidebar() {
     });
   };
 
+  const handleSaveProject = () => {
+    const projectData = {
+      items,
+      artworks
+    };
+    const blob = new Blob([JSON.stringify(projectData)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'spark-project.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadProject = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.items && data.artworks) {
+          useBuilderStore.setState({ items: data.items, artworks: data.artworks, selectedItemIds: [] });
+        }
+      } catch (error) {
+        console.error('Failed to load project', error);
+        alert('Invalid project file');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleGenerate = () => {
     if (!layoutText.trim()) return;
     const success = generateLayout(layoutText);
@@ -66,22 +110,22 @@ export default function Sidebar() {
     }
   };
 
-  const handleAddSheet = (width: number) => {
+  const handleAddSheet = (width: number, height: number = 2.4) => {
     setPlacementMode({
       type: 'sheet',
-      defaultY: 1.2, // Center at y=1.2 (half of 2.4m height)
+      defaultY: height / 2, // Center at y=height/2
       rotation: [0, 0, 0],
-      dimensions: [width, 2.4, 0.01], // width, height, depth
+      dimensions: [width, height, 0.01], // width, height, depth
       color: '#ffffff'
     });
   };
 
-  const handleAddExtrusion = () => {
+  const handleAddExtrusion = (height: number = 2.4) => {
     setPlacementMode({
       type: 'extrusion',
-      defaultY: 1.2,
+      defaultY: height / 2,
       rotation: [0, 0, 0],
-      dimensions: [0.04, 2.4, 0.04], // 4cm x 4cm x 2.4m
+      dimensions: [0.04, height, 0.04], // 4cm x 4cm x height
       color: '#c0c0c0'
     });
   };
@@ -96,12 +140,12 @@ export default function Sidebar() {
     });
   };
 
-  const handleAddFascia = (length: number) => {
+  const handleAddFascia = (length: number, height: number = 0.3) => {
     setPlacementMode({
       type: 'fascia',
-      defaultY: 2.25, // Placed near the top
+      defaultY: 2.4 - (height / 2), // Placed near the top
       rotation: [0, 0, 0],
-      dimensions: [length, 0.3, 0.02],
+      dimensions: [length, height, 0.02],
       color: '#ffffff'
     });
   };
@@ -116,31 +160,55 @@ export default function Sidebar() {
     });
   };
 
+  const handleAddCarpet = (width: number = 3, depth: number = 3) => {
+    setPlacementMode({
+      type: 'carpet',
+      defaultY: 0.005,
+      rotation: [0, 0, 0],
+      dimensions: [width, 0.01, depth],
+      color: '#e2e8f0' // light gray default
+    });
+  };
+
   const handleExport = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const link = document.createElement('a');
-      link.download = `shell-scheme-${viewMode}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
+    useBuilderStore.getState().setIsExporting(true);
+    setTimeout(() => {
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        const link = document.createElement('a');
+        link.download = `shell-scheme-${viewMode}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+      useBuilderStore.getState().setIsExporting(false);
+    }, 100);
   };
 
   return (
-    <div className="w-64 bg-zinc-900 text-zinc-100 h-full flex flex-col border-r border-zinc-800 shrink-0">
-      <div className="p-4 border-b border-zinc-800">
-        <h1 className="text-xl font-bold tracking-tight">Shell Scheme Builder</h1>
+    <div className="w-64 bg-white text-gray-900 h-full flex flex-col border-r border-gray-200 shrink-0">
+      <div className="p-4 border-b border-gray-200">
+        <img src="/spark-logo.svg" alt="Spark Innovations" className="h-8 mb-3" />
+        <h1 className="text-xl font-bold tracking-tight">3D Builder</h1>
+        <div className="flex gap-2 mt-3">
+          <button onClick={handleSaveProject} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-xs">
+            <Save size={14} /> Save
+          </button>
+          <label className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-xs cursor-pointer">
+            <FolderOpen size={14} /> Load
+            <input type="file" className="hidden" accept=".json" onChange={handleLoadProject} ref={fileInputRef} />
+          </label>
+        </div>
       </div>
 
       {placementMode && (
-        <div className="p-4 bg-indigo-900/20 border-b border-indigo-500/30">
-          <h3 className="text-sm font-medium text-indigo-300 mb-2">Placement Mode Active</h3>
-          <p className="text-xs text-zinc-400 mb-3">Hover over the grid to preview. Click or press Spacebar to place. Press 'R' to rotate.</p>
+        <div className="p-4 bg-indigo-50 border-b border-indigo-200">
+          <h3 className="text-sm font-medium text-indigo-700 mb-2">Placement Mode Active</h3>
+          <p className="text-xs text-gray-500 mb-3">Hover over the grid to preview. Click or press Spacebar to place. Press 'R' to rotate.</p>
           <div className="flex gap-2">
-            <button onClick={rotatePlacement} className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg transition-colors text-xs">
+            <button onClick={rotatePlacement} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-xs">
               <RotateCw size={14} /> Rotate
             </button>
-            <button onClick={() => setPlacementMode(null)} className="flex-1 flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 p-2 rounded-lg transition-colors text-xs">
+            <button onClick={() => setPlacementMode(null)} className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition-colors text-xs">
               Cancel
             </button>
           </div>
@@ -149,17 +217,17 @@ export default function Sidebar() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">View Mode</h2>
-          <div className="flex bg-zinc-800 rounded-lg p-1">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">View Mode</h2>
+          <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('2d')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm rounded-md transition-colors ${viewMode === '2d' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm rounded-md transition-colors ${viewMode === '2d' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               <View size={16} /> 2D
             </button>
             <button
               onClick={() => setViewMode('3d')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm rounded-md transition-colors ${viewMode === '3d' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm rounded-md transition-colors ${viewMode === '3d' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               <Box size={16} /> 3D
             </button>
@@ -167,7 +235,7 @@ export default function Sidebar() {
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Quick Layout Generator</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Quick Layout Generator</h2>
           <div className="space-y-2">
             <div className="flex gap-2">
               <input 
@@ -175,7 +243,7 @@ export default function Sidebar() {
                 value={layoutText}
                 onChange={(e) => { setLayoutText(e.target.value); setLayoutError(false); }}
                 placeholder="e.g. 10 3x3 back to back"
-                className={`flex-1 bg-zinc-800 border ${layoutError ? 'border-red-500' : 'border-zinc-700'} rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500`}
+                className={`flex-1 bg-gray-100 border ${layoutError ? 'border-red-500' : 'border-gray-300'} rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500`}
                 onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
               />
               <button 
@@ -187,23 +255,23 @@ export default function Sidebar() {
               </button>
             </div>
             {layoutError && (
-              <p className="text-xs text-red-400">Format not recognized. Try "10 3x3 in line" or "10 3x3 back to back".</p>
+              <p className="text-xs text-red-600">Format not recognized. Try "10 3x3 in line" or "10 3x3 back to back".</p>
             )}
           </div>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Pre-built Booths</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Pre-built Booths</h2>
           <div className="space-y-2">
-            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [3, 3], defaultY: 0, dimensions: [3, 2.4, 3], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-800/50">
+            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [3, 3], defaultY: 0, dimensions: [3, 2.4, 3], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-200">
               <LayoutGrid size={18} />
               3x3 Booth
             </button>
-            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [2, 3], defaultY: 0, dimensions: [2, 2.4, 3], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-800/50">
+            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [2, 3], defaultY: 0, dimensions: [2, 2.4, 3], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-200">
               <LayoutGrid size={18} />
               2x3 Booth
             </button>
-            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [2, 2], defaultY: 0, dimensions: [2, 2.4, 2], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-800/50">
+            <button onClick={() => setPlacementMode({ type: 'booth', boothSize: [2, 2], defaultY: 0, dimensions: [2, 2.4, 2], color: '#4f46e5' })} className="w-full flex items-center gap-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-3 rounded-lg transition-colors text-sm text-left border border-indigo-200">
               <LayoutGrid size={18} />
               2x2 Booth
             </button>
@@ -211,100 +279,181 @@ export default function Sidebar() {
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Panels (2.4m H)</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Custom Sizes</h2>
+          <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <div className="flex gap-2 text-xs text-gray-500 mb-1">
+              <div className="flex-1">Width (m)</div>
+              <div className="flex-1">Height (m)</div>
+              <div className="flex-1">Depth (m)</div>
+            </div>
+            <div className="flex gap-2 mb-3">
+              <input 
+                type="number" 
+                value={customWidth} 
+                onChange={(e) => setCustomWidth(e.target.value)}
+                className="flex-1 w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500"
+                step="0.1"
+              />
+              <input 
+                type="number" 
+                value={customHeight} 
+                onChange={(e) => setCustomHeight(e.target.value)}
+                className="flex-1 w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500"
+                step="0.1"
+              />
+              <input 
+                type="number" 
+                value={customDepth} 
+                onChange={(e) => setCustomDepth(e.target.value)}
+                className="flex-1 w-full bg-white border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500"
+                step="0.1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => handleAddSheet(parseFloat(customWidth) || 1, parseFloat(customHeight) || 2.4)} className="flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 p-2 rounded transition-colors text-xs">
+                <Square size={14} /> Panel
+              </button>
+              <button onClick={() => handleAddFascia(parseFloat(customWidth) || 1, parseFloat(customHeight) || 0.3)} className="flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 p-2 rounded transition-colors text-xs">
+                <Type size={14} /> Fascia
+              </button>
+              <button onClick={() => handleAddBeam(parseFloat(customWidth) || 1)} className="flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 p-2 rounded transition-colors text-xs">
+                <Box size={14} /> Beam
+              </button>
+              <button onClick={() => handleAddExtrusion(parseFloat(customHeight) || 2.4)} className="flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 p-2 rounded transition-colors text-xs">
+                <Columns size={14} /> Extrusion
+              </button>
+              <button onClick={() => handleAddCarpet(parseFloat(customWidth) || 3, parseFloat(customDepth) || 3)} className="col-span-2 flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 p-2 rounded transition-colors text-xs">
+                <Square size={14} /> Custom Carpet
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Panels (2.4m H)</h2>
           <div className="space-y-2">
-            <button onClick={() => handleAddSheet(1)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Square size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddSheet(1)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
               1m Width Panel
             </button>
-            <button onClick={() => handleAddSheet(0.5)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Square size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddSheet(0.5)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
               0.5m Width Panel
             </button>
           </div>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Structure</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Structure</h2>
           <div className="space-y-2">
-            <button onClick={handleAddExtrusion} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Columns size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddExtrusion()} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Columns size={18} className="text-gray-500" />
               Extrusion (2.4m)
             </button>
-            <button onClick={() => handleAddBeam(1)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Box size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddBeam(1)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
               Beam (1m)
             </button>
-            <button onClick={() => handleAddBeam(0.5)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Box size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddBeam(0.5)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
               Beam (0.5m)
             </button>
-            <button onClick={() => handleAddBeam(2)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Box size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddBeam(2)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
               Beam (2m)
             </button>
-            <button onClick={() => handleAddBeam(3)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Box size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddBeam(3)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
               Beam (3m)
             </button>
           </div>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Fascia Boards</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Fascia Boards</h2>
           <div className="space-y-2">
-            <button onClick={() => handleAddFascia(1)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Type size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddFascia(1)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Type size={18} className="text-gray-500" />
               Fascia (1m)
             </button>
-            <button onClick={() => handleAddFascia(2)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Type size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddFascia(2)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Type size={18} className="text-gray-500" />
               Fascia (2m)
             </button>
-            <button onClick={() => handleAddFascia(3)} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Type size={18} className="text-zinc-400" />
+            <button onClick={() => handleAddFascia(3)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Type size={18} className="text-gray-500" />
               Fascia (3m)
             </button>
           </div>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Accessories</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Accessories</h2>
           <div className="space-y-2">
-            <button onClick={handleAddSpotlight} className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-3 rounded-lg transition-colors text-sm text-left">
-              <Lightbulb size={18} className="text-zinc-400" />
+            <button onClick={handleAddSpotlight} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Lightbulb size={18} className="text-gray-500" />
               Spotlight
+            </button>
+            <button onClick={() => handleAddCarpet()} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
+              Carpet (3x3m)
             </button>
           </div>
         </div>
 
         <div>
-          <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Artworks & Graphics</h2>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Artworks & Graphics</h2>
           <div className="space-y-2">
-            <label className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg transition-colors text-sm cursor-pointer border border-dashed border-zinc-600">
+            <label className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-sm cursor-pointer border border-dashed border-gray-300">
               <Upload size={16} /> Upload Artwork
               <input type="file" className="hidden" accept="image/*,.pdf,.ai" onChange={handleFileUpload} />
             </label>
             {artworks.map(art => (
-              <div key={art.id} className="flex items-center justify-between bg-zinc-800/50 p-2 rounded text-xs text-zinc-300">
+              <div key={art.id} className="flex items-center justify-between bg-gray-50 p-2 rounded text-xs text-gray-700">
                 <span className="truncate max-w-[150px]" title={art.name}>{art.name}</span>
-                <button onClick={() => removeArtwork(art.id)} className="text-red-400 hover:text-red-300"><Trash2 size={14}/></button>
+                <button onClick={() => removeArtwork(art.id)} className="text-red-600 hover:text-red-300"><Trash2 size={14}/></button>
               </div>
             ))}
           </div>
         </div>
       </div>
 
+      {selectedItem && selectedItem.type === 'carpet' && (
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Carpet Properties</h3>
+          <div className="flex flex-col items-center">
+            <label className="text-xs text-gray-500 block mb-2 w-full text-left">Carpet Color</label>
+            <HexColorPicker 
+              color={selectedItem.color || '#e2e8f0'} 
+              onChange={(color) => updateItem(selectedItem.id, { color })}
+              style={{ width: '100%', height: '150px' }}
+            />
+            <div className="mt-3 flex items-center gap-2 w-full">
+              <div 
+                className="w-6 h-6 rounded border border-gray-300" 
+                style={{ backgroundColor: selectedItem.color || '#e2e8f0' }}
+              />
+              <input 
+                type="text" 
+                value={selectedItem.color || '#e2e8f0'}
+                onChange={(e) => updateItem(selectedItem.id, { color: e.target.value })}
+                className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedPanels.length > 0 && (
-        <div className="p-4 border-t border-zinc-800 bg-zinc-800/30">
-          <h3 className="text-sm font-medium text-white mb-3">
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">
             {selectedPanels.length === 1 ? 'Panel Properties' : `Multi-Panel Properties (${selectedPanels.length})`}
           </h3>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-zinc-400 block mb-1">Apply Artwork</label>
+              <label className="text-xs text-gray-500 block mb-1">Apply Artwork</label>
               <select 
-                className="w-full bg-zinc-900 border border-zinc-700 rounded p-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm text-gray-900 focus:outline-none focus:border-indigo-500"
                 value={commonArtworkId}
                 onChange={(e) => {
                   if (e.target.value) {
@@ -321,39 +470,58 @@ export default function Sidebar() {
               </select>
             </div>
             {selectedPanels.length === 1 && selectedPanels[0].artworkId && (
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Print Style</label>
-                <div className="flex bg-zinc-900 rounded p-1">
-                  <button 
-                    onClick={() => updateItem(selectedPanels[0].id, { printType: 'normal' })}
-                    className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].printType !== 'seamless' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-300'}`}
-                  >Normal</button>
-                  <button 
-                    onClick={() => updateItem(selectedPanels[0].id, { printType: 'seamless' })}
-                    className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].printType === 'seamless' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-300'}`}
-                  >Seamless</button>
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Print Side</label>
+                  <div className="flex bg-white rounded p-1">
+                    <button 
+                      onClick={() => updateItem(selectedPanels[0].id, { artworkSide: 'front' })}
+                      className={`flex-1 text-xs py-1 rounded ${(!selectedPanels[0].artworkSide || selectedPanels[0].artworkSide === 'front') ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                    >Front</button>
+                    <button 
+                      onClick={() => updateItem(selectedPanels[0].id, { artworkSide: 'back' })}
+                      className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].artworkSide === 'back' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                    >Back</button>
+                    <button 
+                      onClick={() => updateItem(selectedPanels[0].id, { artworkSide: 'both' })}
+                      className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].artworkSide === 'both' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                    >Both</button>
+                  </div>
                 </div>
-              </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Print Style</label>
+                  <div className="flex bg-white rounded p-1">
+                    <button 
+                      onClick={() => updateItem(selectedPanels[0].id, { printType: 'normal' })}
+                      className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].printType !== 'seamless' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >Normal</button>
+                    <button 
+                      onClick={() => updateItem(selectedPanels[0].id, { printType: 'seamless' })}
+                      className={`flex-1 text-xs py-1 rounded ${selectedPanels[0].printType === 'seamless' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                    >Seamless</button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       )}
 
-      <div className="p-4 border-t border-zinc-800 space-y-2">
+      <div className="p-4 border-t border-gray-200 space-y-2">
         <button onClick={handleExport} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors text-sm mb-4">
           <Download size={16} /> Export Image
         </button>
         {selectedItemIds.length > 0 && (
           <>
-            <button onClick={rotateSelectedItem} className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg transition-colors text-sm">
+            <button onClick={rotateSelectedItem} className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-sm">
               <RotateCw size={16} /> Rotate 90°
             </button>
-            <button onClick={() => selectedItemIds.forEach(id => removeItem(id))} className="w-full flex items-center justify-center gap-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 p-2 rounded-lg transition-colors text-sm mb-2">
+            <button onClick={() => selectedItemIds.forEach(id => removeItem(id))} className="w-full flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition-colors text-sm mb-2">
               <Trash2 size={16} /> Delete Selected
             </button>
           </>
         )}
-        <button onClick={clearAll} className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-2 rounded-lg transition-colors text-sm">
+        <button onClick={clearAll} className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg transition-colors text-sm">
           Clear All
         </button>
       </div>

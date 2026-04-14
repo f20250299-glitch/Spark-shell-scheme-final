@@ -6,6 +6,7 @@ import { useBuilderStore, Item, ItemType } from '../store';
 
 function BuilderItem({ item }: { item: Item }) {
   const { selectedItemIds, selectItem, updateItem, viewMode, artworks } = useBuilderStore();
+  const { gl } = useThree();
   const isSelected = selectedItemIds.includes(item.id);
   const transformRef = useRef<any>(null);
   const groupRef = useRef<THREE.Group>(null);
@@ -20,6 +21,9 @@ function BuilderItem({ item }: { item: Item }) {
       loader.load(artwork.dataUrl, (tex) => {
         if (active) {
           tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = gl.capabilities.getMaxAnisotropy();
+          tex.minFilter = THREE.LinearMipmapLinearFilter;
+          tex.magFilter = THREE.LinearFilter;
           setTexture(tex);
         } else {
           tex.dispose();
@@ -31,7 +35,7 @@ function BuilderItem({ item }: { item: Item }) {
     return () => {
       active = false;
     };
-  }, [artwork?.dataUrl]);
+  }, [artwork?.dataUrl, gl]);
 
   useEffect(() => {
     if (texture) {
@@ -68,9 +72,29 @@ function BuilderItem({ item }: { item: Item }) {
   }, [item.id, updateItem]);
 
   const renderGeometry = () => {
+    let currentDimensions = [...item.dimensions] as [number, number, number];
+    let zOffset = 0;
+    
+    const isSeamless = item.printType === 'seamless';
+    const showFront = item.artworkSide === 'front' || item.artworkSide === 'both' || !item.artworkSide;
+    const showBack = item.artworkSide === 'back' || item.artworkSide === 'both';
+
+    if (item.type === 'sheet' || item.type === 'fascia') {
+      if (isSeamless) {
+        if (item.artworkSide === 'back') {
+          zOffset = -0.022;
+        } else if (item.artworkSide === 'both') {
+          zOffset = 0;
+          currentDimensions[2] = 0.045; // Make it thick enough to cover extrusions on both sides
+        } else {
+          zOffset = 0.022; // front
+        }
+      }
+    }
+
     const edges = (
       <lineSegments raycast={() => null}>
-        <edgesGeometry args={[new THREE.BoxGeometry(...item.dimensions)]} />
+        <edgesGeometry args={[new THREE.BoxGeometry(...currentDimensions)]} />
         <lineBasicMaterial color="#000000" linewidth={1} opacity={0.3} transparent />
       </lineSegments>
     );
@@ -81,24 +105,25 @@ function BuilderItem({ item }: { item: Item }) {
     switch (item.type) {
       case 'sheet':
       case 'fascia':
-        const isSeamless = item.printType === 'seamless';
-        const zOffset = isSeamless ? 0.022 : 0;
         return (
           <mesh castShadow receiveShadow position={[0, 0, zOffset]}>
-            <boxGeometry args={item.dimensions} />
-            {[0, 1, 2, 3, 4, 5].map((index) => (
-              <meshStandardMaterial 
-                key={`${index}-${texture ? texture.uuid : 'no-tex'}`}
-                attach={`material-${index}`}
-                color={materialColor} 
-                map={index === 4 ? (texture || null) : null}
-                roughness={0.2} 
-                metalness={0.1} 
-                side={THREE.DoubleSide} 
-                transparent={index === 4 ? !!texture : false}
-              />
-            ))}
-            {edges}
+            <boxGeometry args={currentDimensions} />
+            {[0, 1, 2, 3, 4, 5].map((index) => {
+              const hasTexture = (index === 4 && showFront) || (index === 5 && showBack);
+              return (
+                <meshStandardMaterial 
+                  key={`${index}-${texture ? texture.uuid : 'no-tex'}`}
+                  attach={`material-${index}`}
+                  color={materialColor} 
+                  map={hasTexture ? (texture || null) : null}
+                  roughness={0.2} 
+                  metalness={0.1} 
+                  side={THREE.DoubleSide} 
+                  transparent={hasTexture ? !!texture : false}
+                />
+              );
+            })}
+            {!isSeamless && edges}
           </mesh>
         );
       case 'extrusion':
@@ -119,6 +144,14 @@ function BuilderItem({ item }: { item: Item }) {
             </mesh>
             <pointLight position={[0, -0.1, 0]} intensity={2} distance={5} color="#ffffff" />
           </group>
+        );
+      case 'carpet':
+        return (
+          <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2, 0]}>
+            <boxGeometry args={item.dimensions} />
+            <meshStandardMaterial color={item.color} roughness={0.9} metalness={0.0} />
+            {edges}
+          </mesh>
         );
       default:
         return null;
@@ -160,7 +193,7 @@ function BuilderItem({ item }: { item: Item }) {
 }
 
 function Scene() {
-  const { items, selectItem, viewMode, placementMode, setPlacementMode, addItem, addBooth, rotatePlacement } = useBuilderStore();
+  const { items, selectItem, viewMode, placementMode, setPlacementMode, addItem, addBooth, rotatePlacement, isExporting } = useBuilderStore();
   const { camera } = useThree();
   const [previewPosState, setPreviewPosState] = useState<[number, number, number] | null>(null);
   const previewPosRef = useRef<[number, number, number] | null>(null);
@@ -265,13 +298,15 @@ function Scene() {
       <directionalLight castShadow position={[10, 10, 5]} intensity={1} shadow-mapSize={[1024, 1024]} />
       <Environment preset="city" />
       
-      <Grid 
-        infiniteGrid 
-        fadeDistance={50} 
-        sectionColor="#888" 
-        cellColor="#ccc" 
-        position={[0, 0, 0]} 
-      />
+      {!isExporting && (
+        <Grid 
+          infiniteGrid 
+          fadeDistance={50} 
+          sectionColor="#888" 
+          cellColor="#ccc" 
+          position={[0, 0, 0]} 
+        />
+      )}
       
       <mesh 
         rotation={[-Math.PI / 2, 0, 0]} 
@@ -325,7 +360,11 @@ function Scene() {
         onPointerOut={() => setPreviewPos(null)}
       >
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#f4f4f5" />
+        {isExporting ? (
+          <meshStandardMaterial color="#ffffff" roughness={0.05} metalness={0.2} />
+        ) : (
+          <meshStandardMaterial color="#f4f4f5" />
+        )}
       </mesh>
 
       <group>
@@ -346,7 +385,15 @@ function Scene() {
             ) : (
               <mesh>
                 <boxGeometry args={placementMode.dimensions} />
-                <meshStandardMaterial color={placementMode.color} opacity={0.5} transparent />
+                <meshStandardMaterial 
+                  color={placementMode.type === 'carpet' ? '#4f46e5' : placementMode.color} 
+                  opacity={0.5} 
+                  transparent 
+                />
+                <lineSegments>
+                  <edgesGeometry args={[new THREE.BoxGeometry(...placementMode.dimensions)]} />
+                  <lineBasicMaterial color="#4f46e5" linewidth={2} />
+                </lineSegments>
               </mesh>
             )}
           </group>
@@ -366,11 +413,12 @@ function Scene() {
 }
 
 export default function BuilderCanvas() {
-  const { viewMode } = useBuilderStore();
+  const { viewMode, isExporting } = useBuilderStore();
 
   return (
-    <div className="flex-1 h-full bg-zinc-100 relative">
+    <div className="flex-1 h-full bg-gray-50 relative">
       <Canvas shadows gl={{ preserveDrawingBuffer: true }}>
+        {isExporting && <color attach="background" args={['#ffffff']} />}
         {viewMode === '2d' ? (
           <OrthographicCamera makeDefault position={[0, 10, 0]} zoom={50} near={0.1} far={1000} />
         ) : (
@@ -378,10 +426,10 @@ export default function BuilderCanvas() {
         )}
         <Scene />
       </Canvas>
-      <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-md shadow-sm text-sm font-medium text-zinc-700 pointer-events-none">
+      <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-md shadow-sm text-sm font-medium text-gray-700 pointer-events-none">
         {viewMode === '2d' ? 'Top View (2D)' : 'Perspective View (3D)'}
       </div>
-      <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-md shadow-sm text-xs text-zinc-500 pointer-events-none">
+      <div className="absolute bottom-4 left-4 bg-white/80 backdrop-blur px-3 py-1.5 rounded-md shadow-sm text-xs text-gray-500 pointer-events-none">
         Tip: Click to select, drag arrows to move.
       </div>
     </div>

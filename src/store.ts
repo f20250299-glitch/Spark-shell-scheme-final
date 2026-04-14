@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
-export type ItemType = 'sheet' | 'extrusion' | 'beam' | 'spotlight' | 'fascia';
+export type ItemType = 'sheet' | 'extrusion' | 'beam' | 'spotlight' | 'fascia' | 'carpet';
 
 export interface Artwork {
   id: string;
@@ -17,6 +17,7 @@ export interface Item {
   dimensions: [number, number, number]; // width, height, depth
   color?: string;
   artworkId?: string;
+  artworkSide?: 'front' | 'back' | 'both';
   printType?: 'normal' | 'seamless';
   textureOffset?: [number, number];
   textureRepeat?: [number, number];
@@ -37,6 +38,7 @@ interface BuilderState {
   artworks: Artwork[];
   selectedItemIds: string[];
   viewMode: '2d' | '3d';
+  isExporting: boolean;
   placementMode: PlacementMode | null;
   clipboard: Item | null;
   history: Item[][];
@@ -57,6 +59,7 @@ interface BuilderState {
   applyArtworkToPanels: (itemIds: string[], artworkId: string) => void;
   selectItem: (id: string | null, multi?: boolean) => void;
   setViewMode: (mode: '2d' | '3d') => void;
+  setIsExporting: (isExporting: boolean) => void;
   rotateSelectedItem: () => void;
   clearAll: () => void;
 }
@@ -135,6 +138,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
   artworks: [],
   selectedItemIds: [],
   viewMode: '3d',
+  isExporting: false,
   placementMode: null,
   clipboard: null,
   history: [[]],
@@ -347,6 +351,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
     return { selectedItemIds: [id] };
   }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setIsExporting: (isExporting) => set({ isExporting }),
   rotateSelectedItem: () => set((state) => {
     if (state.selectedItemIds.length === 0) return state;
     const newItems = state.items.map((item) => {

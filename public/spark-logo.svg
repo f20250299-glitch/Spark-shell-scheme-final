@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">
+  <g transform="translate(50, 50) scale(0.8)">
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#FDB813" transform="rotate(30)" />
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#8CC63F" transform="rotate(90)" />
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#29ABE2" transform="rotate(150)" />
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#662D91" transform="rotate(210)" />
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#ED1C24" transform="rotate(270)" />
+    <path d="M 0 0 C -20 -40, 0 -60, 0 -60 C 0 -60, 20 -40, 0 0" fill="#F7931E" transform="rotate(330)" />
+    <circle cx="0" cy="0" r="8" fill="#FFFFFF" />
+  </g>
+  <text x="110" y="45" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="#333333">spark</text>
+  <text x="110" y="75" font-family="Arial, sans-serif" font-weight="bold" font-size="28" fill="#444444">innovations</text>
+</svg>
