@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useBuilderStore } from '../store';
-import { Box, Columns, Lightbulb, Square, Trash2, View, Download, RotateCw, LayoutGrid, Type, Wand2, Upload, Save, FolderOpen } from 'lucide-react';
+import { Box, Columns, Lightbulb, Square, Trash2, View, Download, RotateCw, LayoutGrid, Type, Wand2, Upload, Save, FolderOpen, Monitor, BookOpen, Coffee, Tv } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PdfCropper from './PdfCropper';
 import { HexColorPicker } from 'react-colorful';
@@ -17,7 +17,7 @@ export default function Sidebar() {
   const [customDepth, setCustomDepth] = useState('3');
 
   const selectedItem = selectedItemIds.length === 1 ? items.find(i => i.id === selectedItemIds[0]) : null;
-  const selectedPanels = items.filter(i => selectedItemIds.includes(i.id) && (i.type === 'sheet' || i.type === 'fascia'));
+  const selectedPanels = items.filter(i => selectedItemIds.includes(i.id) && (i.type === 'sheet' || i.type === 'fascia' || i.type === 'counter-normal' || i.type === 'counter-glass'));
   const commonArtworkId = selectedPanels.length > 0 && selectedPanels.every(p => p.artworkId === selectedPanels[0].artworkId) 
     ? (selectedPanels[0].artworkId || '') 
     : '';
@@ -167,6 +167,77 @@ export default function Sidebar() {
       rotation: [0, 0, 0],
       dimensions: [width, 0.01, depth],
       color: '#e2e8f0' // light gray default
+    });
+  };
+
+  const handleAddCurtain = (isOpen: boolean) => {
+    setPlacementMode({
+      type: isOpen ? 'curtain-open' : 'curtain-closed',
+      defaultY: 1.05, // 2.1 / 2
+      rotation: [0, 0, 0],
+      dimensions: [1, 2.1, 0.05], // 2.1m height to fit under 0.3m fascia
+      color: '#ffffff'
+    });
+  };
+
+  const handleAddDoor = (isFolding: boolean) => {
+    setPlacementMode({
+      type: isFolding ? 'door-folding' : 'door-normal',
+      defaultY: 1.05, // 2.1 / 2
+      rotation: [0, 0, 0],
+      dimensions: [1, 2.1, 0.05], // 2.1m height to fit under 0.3m fascia
+      color: '#ffffff'
+    });
+  };
+
+  const handleAddTable = () => {
+    setPlacementMode({
+      type: 'table',
+      defaultY: 0.375, // 0.75 height / 2
+      rotation: [0, 0, 0],
+      dimensions: [1.2, 0.75, 1.2], // 120cm diameter, 75cm height
+      color: '#ffffff'
+    });
+  };
+
+  const handleAddChair = () => {
+    setPlacementMode({
+      type: 'chair',
+      defaultY: 0.4, // 0.8 height / 2
+      rotation: [0, 0, 0],
+      dimensions: [0.5, 0.8, 0.5], // 50x50cm footprint, 80cm height
+      color: '#ffffff'
+    });
+  };
+
+  const handleAddBrochureStand = () => {
+    setPlacementMode({
+      type: 'brochure-stand',
+      defaultY: 0.75, // 1.5 height / 2
+      rotation: [0, 0, 0],
+      dimensions: [0.3, 1.5, 0.4], // 30cm wide, 1.5m tall, 40cm deep
+      color: '#c0c0c0'
+    });
+  };
+
+  const handleAddTvStand = (size: number) => {
+    setPlacementMode({
+      type: 'tv-stand',
+      defaultY: 0.9, // 1.8 height / 2
+      rotation: [0, 0, 0],
+      dimensions: [0.8, 1.8, 0.6], // Stand dimensions
+      color: '#333333',
+      metadata: { tvSize: size }
+    });
+  };
+
+  const handleAddCounter = (isGlass: boolean) => {
+    setPlacementMode({
+      type: isGlass ? 'counter-glass' : 'counter-normal',
+      defaultY: 0.5, // 1m height / 2
+      rotation: [0, 0, 0],
+      dimensions: [1, 1, 0.5], // 1m wide, 1m high, 0.5m deep
+      color: '#ffffff'
     });
   };
 
@@ -398,6 +469,56 @@ export default function Sidebar() {
               <Square size={18} className="text-gray-500" />
               Carpet (3x3m)
             </button>
+            <button onClick={() => handleAddCurtain(false)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
+              Closed Curtain (1m)
+            </button>
+            <button onClick={() => handleAddCurtain(true)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Columns size={18} className="text-gray-500" />
+              Open Curtain (1m)
+            </button>
+            <button onClick={() => handleAddDoor(false)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
+              Normal Door (1m)
+            </button>
+            <button onClick={() => handleAddDoor(true)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Columns size={18} className="text-gray-500" />
+              Folding Door (1m)
+            </button>
+            <button onClick={handleAddTable} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Coffee size={18} className="text-gray-500" />
+              Table (120cm)
+            </button>
+            <button onClick={handleAddChair} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Square size={18} className="text-gray-500" />
+              Chair
+            </button>
+            <button onClick={handleAddBrochureStand} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <BookOpen size={18} className="text-gray-500" />
+              Brochure Stand
+            </button>
+            <div className="flex gap-2">
+              <select 
+                className="flex-1 bg-gray-100 border-none text-sm p-3 rounded-lg text-gray-700"
+                onChange={(e) => handleAddTvStand(Number(e.target.value))}
+                defaultValue=""
+              >
+                <option value="" disabled>Add TV Stand...</option>
+                <option value="32">32" TV Stand</option>
+                <option value="42">42" TV Stand</option>
+                <option value="50">50" TV Stand</option>
+                <option value="55">55" TV Stand</option>
+                <option value="65">65" TV Stand</option>
+              </select>
+            </div>
+            <button onClick={() => handleAddCounter(false)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
+              Counter (Normal)
+            </button>
+            <button onClick={() => handleAddCounter(true)} className="w-full flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-3 rounded-lg transition-colors text-sm text-left">
+              <Box size={18} className="text-gray-500" />
+              Counter (Glass)
+            </button>
           </div>
         </div>
 
@@ -418,11 +539,13 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {selectedItem && selectedItem.type === 'carpet' && (
+      {selectedItem && ['carpet', 'curtain-closed', 'curtain-open', 'door-normal', 'door-folding', 'table', 'chair', 'brochure-stand', 'tv-stand', 'counter-normal', 'counter-glass'].includes(selectedItem.type) && (
         <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Carpet Properties</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-3 capitalize">
+            {selectedItem.type.replace('-', ' ')} Properties
+          </h3>
           <div className="flex flex-col items-center">
-            <label className="text-xs text-gray-500 block mb-2 w-full text-left">Carpet Color</label>
+            <label className="text-xs text-gray-500 block mb-2 w-full text-left">Color</label>
             <HexColorPicker 
               color={selectedItem.color || '#e2e8f0'} 
               onChange={(color) => updateItem(selectedItem.id, { color })}

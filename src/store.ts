@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
-export type ItemType = 'sheet' | 'extrusion' | 'beam' | 'spotlight' | 'fascia' | 'carpet';
+export type ItemType = 'sheet' | 'extrusion' | 'beam' | 'spotlight' | 'fascia' | 'carpet' | 'curtain-closed' | 'curtain-open' | 'door-normal' | 'door-folding' | 'table' | 'chair' | 'brochure-stand' | 'tv-stand' | 'counter-normal' | 'counter-glass';
 
 export interface Artwork {
   id: string;
@@ -31,6 +31,7 @@ export interface PlacementMode {
   color: string;
   rotation?: [number, number, number];
   boothSize?: [number, number];
+  metadata?: any;
 }
 
 interface BuilderState {

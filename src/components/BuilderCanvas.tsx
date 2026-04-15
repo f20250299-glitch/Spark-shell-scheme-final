@@ -153,6 +153,396 @@ function BuilderItem({ item }: { item: Item }) {
             {edges}
           </mesh>
         );
+      case 'curtain-closed': {
+        const numFolds = 24;
+        const foldWidth = item.dimensions[0] / numFolds;
+        const actualFoldWidth = foldWidth * 1.5; // 50% more fabric than straight width
+        const angleVal = Math.acos(foldWidth / actualFoldWidth);
+        
+        return (
+          <group>
+            {/* Curtain Rod */}
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.05, 0.05]} rotation={[0, 0, Math.PI/2]}>
+              <cylinderGeometry args={[0.015, 0.015, item.dimensions[0] + 0.1]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            {/* Rod Ends */}
+            <mesh castShadow receiveShadow position={[-item.dimensions[0]/2 - 0.05, item.dimensions[1]/2 - 0.05, 0.05]}>
+              <sphereGeometry args={[0.025]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[item.dimensions[0]/2 + 0.05, item.dimensions[1]/2 - 0.05, 0.05]}>
+              <sphereGeometry args={[0.025]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            
+            {/* Fabric */}
+            {Array.from({ length: numFolds }).map((_, i) => {
+              const isEven = i % 2 === 0;
+              const angle = isEven ? angleVal : -angleVal;
+              const xPos = -item.dimensions[0]/2 + (i * foldWidth) + (foldWidth / 2);
+              
+              return (
+                <mesh key={i} castShadow receiveShadow position={[xPos, -0.05, 0.05]} rotation={[0, angle, 0]}>
+                  <boxGeometry args={[actualFoldWidth, item.dimensions[1] - 0.1, 0.005]} />
+                  <meshStandardMaterial color={item.color} roughness={0.9} metalness={0.1} side={THREE.DoubleSide} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      }
+      case 'curtain-open': {
+        const numFoldsPerSide = 12;
+        const bunchWidth = item.dimensions[0] * 0.2; // 20% of width per bunch
+        const foldWidth = bunchWidth / numFoldsPerSide;
+        const actualFoldWidth = (item.dimensions[0] / 2) / numFoldsPerSide * 1.5; // Same fabric amount as closed
+        const angleVal = Math.acos(foldWidth / actualFoldWidth);
+
+        return (
+          <group>
+            {/* Curtain Rod */}
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.05, 0.05]} rotation={[0, 0, Math.PI/2]}>
+              <cylinderGeometry args={[0.015, 0.015, item.dimensions[0] + 0.1]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            {/* Rod Ends */}
+            <mesh castShadow receiveShadow position={[-item.dimensions[0]/2 - 0.05, item.dimensions[1]/2 - 0.05, 0.05]}>
+              <sphereGeometry args={[0.025]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[item.dimensions[0]/2 + 0.05, item.dimensions[1]/2 - 0.05, 0.05]}>
+              <sphereGeometry args={[0.025]} />
+              <meshStandardMaterial color="#b48e4b" roughness={0.2} metalness={0.8} />
+            </mesh>
+            
+            {/* Left Bunch */}
+            {Array.from({ length: numFoldsPerSide }).map((_, i) => {
+              const isEven = i % 2 === 0;
+              const angle = isEven ? angleVal : -angleVal;
+              const xPos = -item.dimensions[0]/2 + (i * foldWidth) + (foldWidth / 2);
+              
+              return (
+                <mesh key={`l-${i}`} castShadow receiveShadow position={[xPos, -0.05, 0.05]} rotation={[0, angle, 0]}>
+                  <boxGeometry args={[actualFoldWidth, item.dimensions[1] - 0.1, 0.005]} />
+                  <meshStandardMaterial color={item.color} roughness={0.9} metalness={0.1} side={THREE.DoubleSide} />
+                </mesh>
+              );
+            })}
+
+            {/* Right Bunch */}
+            {Array.from({ length: numFoldsPerSide }).map((_, i) => {
+              const isEven = i % 2 === 0;
+              const angle = isEven ? angleVal : -angleVal;
+              const xPos = item.dimensions[0]/2 - bunchWidth + (i * foldWidth) + (foldWidth / 2);
+              
+              return (
+                <mesh key={`r-${i}`} castShadow receiveShadow position={[xPos, -0.05, 0.05]} rotation={[0, angle, 0]}>
+                  <boxGeometry args={[actualFoldWidth, item.dimensions[1] - 0.1, 0.005]} />
+                  <meshStandardMaterial color={item.color} roughness={0.9} metalness={0.1} side={THREE.DoubleSide} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      }
+      case 'door-normal':
+        return (
+          <group>
+            {/* Outer Frame (Left, Right, Top, Bottom, Middle) */}
+            <mesh castShadow receiveShadow position={[-item.dimensions[0]/2 + 0.02, 0, 0]}>
+              <boxGeometry args={[0.04, item.dimensions[1], 0.04]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[item.dimensions[0]/2 - 0.02, 0, 0]}>
+              <boxGeometry args={[0.04, item.dimensions[1], 0.04]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.02, 0]}>
+              <boxGeometry args={[item.dimensions[0] - 0.08, 0.04, 0.04]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2 + 0.02, 0]}>
+              <boxGeometry args={[item.dimensions[0] - 0.08, 0.04, 0.04]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0, -0.2, 0]}> {/* Middle bar at ~1m height */}
+              <boxGeometry args={[item.dimensions[0] - 0.08, 0.04, 0.04]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            
+            {/* Top Panel */}
+            <mesh castShadow receiveShadow position={[0, 0.48, 0]}>
+              <boxGeometry args={[item.dimensions[0] - 0.08, 1.32, 0.01]} />
+              <meshStandardMaterial color={item.color} roughness={0.5} metalness={0.1} />
+            </mesh>
+            
+            {/* Bottom Panel */}
+            <mesh castShadow receiveShadow position={[0, -0.68, 0]}>
+              <boxGeometry args={[item.dimensions[0] - 0.08, 0.92, 0.01]} />
+              <meshStandardMaterial color={item.color} roughness={0.5} metalness={0.1} />
+            </mesh>
+
+            {/* Handle */}
+            <group position={[item.dimensions[0]/2 - 0.1, -0.2, 0.03]}>
+              {/* Backplate */}
+              <mesh castShadow receiveShadow position={[0, 0, 0]}>
+                <boxGeometry args={[0.04, 0.15, 0.01]} />
+                <meshStandardMaterial color="#9ca3af" roughness={0.3} metalness={0.8} />
+              </mesh>
+              {/* Lever */}
+              <mesh castShadow receiveShadow position={[-0.04, 0.02, 0.03]}>
+                <boxGeometry args={[0.1, 0.02, 0.02]} />
+                <meshStandardMaterial color="#9ca3af" roughness={0.3} metalness={0.8} />
+              </mesh>
+              {/* Spindle */}
+              <mesh castShadow receiveShadow position={[0, 0.02, 0.015]} rotation={[Math.PI/2, 0, 0]}>
+                <cylinderGeometry args={[0.01, 0.01, 0.03]} />
+                <meshStandardMaterial color="#9ca3af" roughness={0.3} metalness={0.8} />
+              </mesh>
+            </group>
+          </group>
+        );
+      case 'door-folding': {
+        const numFolds = 8;
+        const foldWidth = item.dimensions[0] / numFolds;
+        const foldAngle = Math.PI / 6; // 30 degrees
+        const actualFoldWidth = foldWidth / Math.cos(foldAngle);
+        
+        return (
+          <group>
+            {/* Top Track */}
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.02, 0]}>
+              <boxGeometry args={[item.dimensions[0], 0.04, 0.06]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.4} metalness={0.8} />
+            </mesh>
+            
+            {/* Folds */}
+            {Array.from({ length: numFolds }).map((_, i) => {
+              const isEven = i % 2 === 0;
+              const angle = isEven ? foldAngle : -foldAngle;
+              const xPos = -item.dimensions[0]/2 + (i * foldWidth) + (foldWidth / 2);
+              
+              return (
+                <mesh key={i} castShadow receiveShadow position={[xPos, -0.02, 0]} rotation={[0, angle, 0]}>
+                  <boxGeometry args={[actualFoldWidth, item.dimensions[1] - 0.04, 0.01]} />
+                  <meshStandardMaterial color={item.color} roughness={0.5} metalness={0.1} />
+                  <lineSegments>
+                    <edgesGeometry args={[new THREE.BoxGeometry(actualFoldWidth, item.dimensions[1] - 0.04, 0.01)]} />
+                    <lineBasicMaterial color="#9ca3af" linewidth={1} />
+                  </lineSegments>
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      }
+      case 'table':
+        return (
+          <group>
+            {/* Glass Top */}
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.01, 0]}>
+              <cylinderGeometry args={[item.dimensions[0]/2, item.dimensions[0]/2, 0.02, 32]} />
+              <meshPhysicalMaterial color="#a0aab5" transmission={0.9} opacity={1} transparent roughness={0.1} ior={1.5} thickness={0.02} />
+            </mesh>
+            {/* Central Pole */}
+            <mesh castShadow receiveShadow position={[0, 0, 0]}>
+              <cylinderGeometry args={[0.04, 0.04, item.dimensions[1] - 0.04, 16]} />
+              <meshStandardMaterial color="#d1d5db" roughness={0.3} metalness={0.8} />
+            </mesh>
+            {/* Base */}
+            <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2 + 0.01, 0]}>
+              <cylinderGeometry args={[0.3, 0.3, 0.02, 32]} />
+              <meshStandardMaterial color="#d1d5db" roughness={0.3} metalness={0.8} />
+            </mesh>
+          </group>
+        );
+      case 'chair':
+        return (
+          <group>
+            {/* Seat */}
+            <mesh castShadow receiveShadow position={[0, 0.1, 0]}>
+              <boxGeometry args={[0.45, 0.05, 0.4]} />
+              <meshStandardMaterial color={item.color} roughness={0.4} />
+            </mesh>
+            {/* Backrest */}
+            <mesh castShadow receiveShadow position={[0, 0.3, -0.18]} rotation={[0.2, 0, 0]}>
+              <boxGeometry args={[0.4, 0.4, 0.05]} />
+              <meshStandardMaterial color={item.color} roughness={0.4} />
+            </mesh>
+            {/* Legs (Wooden) */}
+            {[-0.18, 0.18].map((x, i) => 
+              [-0.15, 0.15].map((z, j) => (
+                <mesh key={`${i}-${j}`} castShadow receiveShadow position={[x, -0.15, z]} rotation={[z > 0 ? -0.1 : 0.1, 0, x > 0 ? 0.1 : -0.1]}>
+                  <cylinderGeometry args={[0.015, 0.01, 0.45, 8]} />
+                  <meshStandardMaterial color="#d4a373" roughness={0.8} />
+                </mesh>
+              ))
+            )}
+            {/* Metal Cross Braces */}
+            <mesh castShadow receiveShadow position={[0, -0.1, 0]} rotation={[Math.PI/2, 0, Math.PI/4]}>
+              <cylinderGeometry args={[0.005, 0.005, 0.4, 8]} />
+              <meshStandardMaterial color="#111827" roughness={0.5} metalness={0.8} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0, -0.1, 0]} rotation={[Math.PI/2, 0, -Math.PI/4]}>
+              <cylinderGeometry args={[0.005, 0.005, 0.4, 8]} />
+              <meshStandardMaterial color="#111827" roughness={0.5} metalness={0.8} />
+            </mesh>
+          </group>
+        );
+      case 'brochure-stand':
+        return (
+          <group>
+            {/* Central Spine */}
+            <mesh castShadow receiveShadow position={[0, 0, -0.1]}>
+              <boxGeometry args={[0.05, item.dimensions[1], 0.05]} />
+              <meshStandardMaterial color="#d1d5db" roughness={0.4} metalness={0.6} />
+            </mesh>
+            {/* Base */}
+            <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2 + 0.02, 0]}>
+              <boxGeometry args={[0.3, 0.04, 0.4]} />
+              <meshStandardMaterial color="#d1d5db" roughness={0.4} metalness={0.6} />
+            </mesh>
+            {/* Shelves (Zigzag) */}
+            {[0.4, 0.1, -0.2, -0.5].map((y, i) => (
+              <mesh key={i} castShadow receiveShadow position={[0, y, 0]} rotation={[0.5, 0, 0]}>
+                <boxGeometry args={[0.25, 0.3, 0.02]} />
+                <meshPhysicalMaterial color="#ffffff" transmission={0.5} opacity={0.8} transparent roughness={0.2} />
+                <mesh castShadow receiveShadow position={[0, -0.15, 0.02]}>
+                  <boxGeometry args={[0.25, 0.02, 0.04]} />
+                  <meshStandardMaterial color="#d1d5db" roughness={0.4} metalness={0.6} />
+                </mesh>
+              </mesh>
+            ))}
+          </group>
+        );
+      case 'tv-stand': {
+        const tvSizeInches = item.metadata?.tvSize || 50;
+        // Rough conversion: 1 inch diagonal = ~0.022m width, ~0.012m height
+        const tvWidth = tvSizeInches * 0.022;
+        const tvHeight = tvSizeInches * 0.012;
+        
+        return (
+          <group>
+            {/* Base */}
+            <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2 + 0.05, 0]}>
+              <boxGeometry args={[0.8, 0.04, 0.6]} />
+              <meshStandardMaterial color="#111827" roughness={0.6} />
+            </mesh>
+            {/* Wheels */}
+            {[-0.35, 0.35].map(x => 
+              [-0.25, 0.25].map(z => (
+                <mesh key={`${x}-${z}`} castShadow receiveShadow position={[x, -item.dimensions[1]/2 + 0.02, z]} rotation={[0, 0, Math.PI/2]}>
+                  <cylinderGeometry args={[0.02, 0.02, 0.02, 16]} />
+                  <meshStandardMaterial color="#374151" roughness={0.8} />
+                </mesh>
+              ))
+            )}
+            {/* Vertical Poles */}
+            <mesh castShadow receiveShadow position={[-0.15, 0, 0]}>
+              <cylinderGeometry args={[0.03, 0.03, item.dimensions[1] - 0.1, 16]} />
+              <meshStandardMaterial color="#111827" roughness={0.6} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[0.15, 0, 0]}>
+              <cylinderGeometry args={[0.03, 0.03, item.dimensions[1] - 0.1, 16]} />
+              <meshStandardMaterial color="#111827" roughness={0.6} />
+            </mesh>
+            {/* TV Screen */}
+            <mesh castShadow receiveShadow position={[0, 0.4, 0.05]}>
+              <boxGeometry args={[tvWidth, tvHeight, 0.05]} />
+              <meshStandardMaterial color="#000000" roughness={0.1} metalness={0.8} />
+              {/* Screen Bezel */}
+              <lineSegments>
+                <edgesGeometry args={[new THREE.BoxGeometry(tvWidth, tvHeight, 0.05)]} />
+                <lineBasicMaterial color="#374151" linewidth={2} />
+              </lineSegments>
+            </mesh>
+          </group>
+        );
+      }
+      case 'counter-normal':
+      case 'counter-glass': {
+        const isGlass = item.type === 'counter-glass';
+        return (
+          <group>
+            {/* Aluminum Frame Edges */}
+            <lineSegments>
+              <edgesGeometry args={[new THREE.BoxGeometry(item.dimensions[0], item.dimensions[1], item.dimensions[2])]} />
+              <lineBasicMaterial color="#9ca3af" linewidth={2} />
+            </lineSegments>
+            
+            {/* Top Surface */}
+            <mesh castShadow receiveShadow position={[0, item.dimensions[1]/2 - 0.01, 0]}>
+              <boxGeometry args={[item.dimensions[0], 0.02, item.dimensions[2]]} />
+              {isGlass ? (
+                <meshPhysicalMaterial color="#a0aab5" transmission={0.9} opacity={1} transparent roughness={0.1} ior={1.5} thickness={0.02} />
+              ) : (
+                <meshStandardMaterial color={item.color} roughness={0.5} />
+              )}
+            </mesh>
+            
+            {/* Bottom Base */}
+            <mesh castShadow receiveShadow position={[0, -item.dimensions[1]/2 + 0.02, 0]}>
+              <boxGeometry args={[item.dimensions[0], 0.04, item.dimensions[2]]} />
+              <meshStandardMaterial color="#e5e7eb" roughness={0.5} />
+            </mesh>
+            
+            {/* Front Panel */}
+            <mesh castShadow receiveShadow position={[0, isGlass ? -item.dimensions[1]/4 : 0, item.dimensions[2]/2 - 0.01]}>
+              <boxGeometry args={[item.dimensions[0] - 0.04, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, 0.02]} />
+              <meshStandardMaterial color={item.color} roughness={0.5} map={texture || null} />
+            </mesh>
+            
+            {/* Side Panels */}
+            <mesh castShadow receiveShadow position={[-item.dimensions[0]/2 + 0.01, isGlass ? -item.dimensions[1]/4 : 0, 0]}>
+              <boxGeometry args={[0.02, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, item.dimensions[2] - 0.04]} />
+              <meshStandardMaterial color={item.color} roughness={0.5} map={texture || null} />
+            </mesh>
+            <mesh castShadow receiveShadow position={[item.dimensions[0]/2 - 0.01, isGlass ? -item.dimensions[1]/4 : 0, 0]}>
+              <boxGeometry args={[0.02, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, item.dimensions[2] - 0.04]} />
+              <meshStandardMaterial color={item.color} roughness={0.5} map={texture || null} />
+            </mesh>
+
+            {/* Glass Showcase (if glass counter) */}
+            {isGlass && (
+              <group position={[0, item.dimensions[1]/4, 0]}>
+                <mesh castShadow receiveShadow position={[0, 0, item.dimensions[2]/2 - 0.01]}>
+                  <boxGeometry args={[item.dimensions[0] - 0.04, item.dimensions[1]/2, 0.01]} />
+                  <meshPhysicalMaterial color="#ffffff" transmission={0.9} opacity={1} transparent roughness={0.1} />
+                </mesh>
+                <mesh castShadow receiveShadow position={[-item.dimensions[0]/2 + 0.01, 0, 0]}>
+                  <boxGeometry args={[0.01, item.dimensions[1]/2, item.dimensions[2] - 0.04]} />
+                  <meshPhysicalMaterial color="#ffffff" transmission={0.9} opacity={1} transparent roughness={0.1} />
+                </mesh>
+                <mesh castShadow receiveShadow position={[item.dimensions[0]/2 - 0.01, 0, 0]}>
+                  <boxGeometry args={[0.01, item.dimensions[1]/2, item.dimensions[2] - 0.04]} />
+                  <meshPhysicalMaterial color="#ffffff" transmission={0.9} opacity={1} transparent roughness={0.1} />
+                </mesh>
+                {/* Middle Glass Shelf */}
+                <mesh castShadow receiveShadow position={[0, 0, 0]}>
+                  <boxGeometry args={[item.dimensions[0] - 0.04, 0.01, item.dimensions[2] - 0.04]} />
+                  <meshPhysicalMaterial color="#ffffff" transmission={0.9} opacity={1} transparent roughness={0.1} />
+                </mesh>
+              </group>
+            )}
+
+            {/* Back Sliding Doors (Indicated by lines) */}
+            <mesh castShadow receiveShadow position={[0, isGlass ? -item.dimensions[1]/4 : 0, -item.dimensions[2]/2 + 0.01]}>
+              <boxGeometry args={[item.dimensions[0] - 0.04, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, 0.02]} />
+              <meshStandardMaterial color="#f3f4f6" roughness={0.5} />
+              <lineSegments>
+                <edgesGeometry args={[new THREE.BoxGeometry(item.dimensions[0] - 0.04, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, 0.02)]} />
+                <lineBasicMaterial color="#d1d5db" linewidth={1} />
+              </lineSegments>
+              {/* Center line for sliding door split */}
+              <mesh position={[0, 0, 0.011]}>
+                <boxGeometry args={[0.01, isGlass ? item.dimensions[1]/2 : item.dimensions[1] - 0.04, 0.001]} />
+                <meshBasicMaterial color="#d1d5db" />
+              </mesh>
+            </mesh>
+          </group>
+        );
+      }
       default:
         return null;
     }
@@ -235,7 +625,8 @@ function Scene() {
               position: pos,
               rotation: placementMode.rotation || [0, 0, 0],
               dimensions: placementMode.dimensions,
-              color: placementMode.color
+              color: placementMode.color,
+              metadata: placementMode.metadata
             });
           }
           setPreviewPos(null);
@@ -246,6 +637,43 @@ function Scene() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const { selectedItemIds, removeItem } = useBuilderStore.getState();
         selectedItemIds.forEach(id => removeItem(id));
+      }
+
+      // Arrow Key Movement
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const { selectedItemIds, items, updateItem } = useBuilderStore.getState();
+        if (selectedItemIds.length > 0) {
+          e.preventDefault(); // Prevent scrolling
+          const step = e.shiftKey ? 0.1 : 0.01; // Shift for larger steps
+          selectedItemIds.forEach(id => {
+            const item = items.find(i => i.id === id);
+            if (item) {
+              const newPos = [...item.position] as [number, number, number];
+              if (e.key === 'ArrowUp') newPos[1] += step;
+              if (e.key === 'ArrowDown') newPos[1] -= step;
+              if (e.key === 'ArrowLeft') newPos[0] -= step;
+              if (e.key === 'ArrowRight') newPos[0] += step;
+              updateItem(id, { position: newPos });
+            }
+          });
+        }
+      }
+
+      // Fine Rotation
+      if (e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') {
+        const { selectedItemIds, items, updateItem } = useBuilderStore.getState();
+        if (selectedItemIds.length > 0) {
+          const angle = Math.PI / 12; // 15 degrees
+          const rotationStep = (e.key === 'q' || e.key === 'Q') ? angle : -angle;
+          selectedItemIds.forEach(id => {
+            const item = items.find(i => i.id === id);
+            if (item) {
+              const newRot = [...item.rotation] as [number, number, number];
+              newRot[1] += rotationStep;
+              updateItem(id, { rotation: newRot });
+            }
+          });
+        }
       }
 
       // Copy, Paste, Cut, Undo, Redo
@@ -349,7 +777,8 @@ function Scene() {
                 position: previewPosState,
                 rotation: placementMode.rotation || [0, 0, 0],
                 dimensions: placementMode.dimensions,
-                color: placementMode.color
+                color: placementMode.color,
+                metadata: placementMode.metadata
               });
             }
             setPreviewPos(null);
@@ -386,7 +815,7 @@ function Scene() {
               <mesh>
                 <boxGeometry args={placementMode.dimensions} />
                 <meshStandardMaterial 
-                  color={placementMode.type === 'carpet' ? '#4f46e5' : placementMode.color} 
+                  color={['carpet', 'curtain-closed', 'curtain-open', 'door-normal', 'door-folding', 'table', 'chair', 'brochure-stand', 'tv-stand', 'counter-normal', 'counter-glass'].includes(placementMode.type) ? '#4f46e5' : placementMode.color} 
                   opacity={0.5} 
                   transparent 
                 />
