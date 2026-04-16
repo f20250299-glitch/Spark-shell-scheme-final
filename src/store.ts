@@ -129,9 +129,66 @@ const createBoothItems = (width: number, depth: number, centerPos: [number, numb
   }
 
   // Front fascia beam
-  add('beam', [0, 2.4, depth / 2], [0, 0, 0], [width, 0.04, 0.04], metalColor);
+  let currentX = -width / 2;
+  let remainingWidth = width;
+  while (remainingWidth > 0) {
+    const chunkWidth = Math.min(3, remainingWidth);
+    const centerX = currentX + chunkWidth / 2;
+    add('beam', [centerX, 2.4, depth / 2], [0, 0, 0], [chunkWidth, 0.04, 0.04], metalColor);
+    
+    currentX += chunkWidth;
+    remainingWidth -= chunkWidth;
+    
+    if (remainingWidth > 0) {
+      add('extrusion', [currentX, 1.2, depth / 2], [0, 0, 0], [0.04, 2.4, 0.04], metalColor);
+    }
+  }
 
   return newItems;
+};
+
+const deduplicateItems = (existingItems: Item[], newItems: Item[]): Item[] => {
+  const uniqueItems: Item[] = [];
+  for (const item of newItems) {
+    const isDuplicate = [...existingItems, ...uniqueItems].some(existing => {
+      if (existing.type !== item.type) return false;
+      
+      const posMatch = 
+        Math.abs(existing.position[0] - item.position[0]) < 0.01 &&
+        Math.abs(existing.position[1] - item.position[1]) < 0.01 &&
+        Math.abs(existing.position[2] - item.position[2]) < 0.01;
+      
+      if (!posMatch) return false;
+
+      const dimMatch = 
+        Math.abs(existing.dimensions[0] - item.dimensions[0]) < 0.01 &&
+        Math.abs(existing.dimensions[1] - item.dimensions[1]) < 0.01 &&
+        Math.abs(existing.dimensions[2] - item.dimensions[2]) < 0.01;
+
+      if (!dimMatch) return false;
+
+      const rot1Y = existing.rotation?.[1] || 0;
+      const rot2Y = item.rotation?.[1] || 0;
+      
+      const normalizeAngle = (a: number) => {
+        let normalized = a % Math.PI;
+        if (normalized < 0) normalized += Math.PI;
+        if (Math.abs(normalized - Math.PI) < 0.01) normalized = 0;
+        return normalized;
+      };
+
+      const n1 = normalizeAngle(rot1Y);
+      const n2 = normalizeAngle(rot2Y);
+      
+      const diff = Math.abs(n1 - n2);
+      return diff < 0.01 || Math.abs(diff - Math.PI) < 0.01;
+    });
+
+    if (!isDuplicate) {
+      uniqueItems.push(item);
+    }
+  }
+  return uniqueItems;
 };
 
 export const useBuilderStore = create<BuilderState>((set) => ({
@@ -179,8 +236,52 @@ export const useBuilderStore = create<BuilderState>((set) => ({
     };
   }),
   addItem: (item) => set((state) => {
-    const newId = uuidv4();
-    const newItems = [...state.items, { ...item, id: newId }];
+    const itemsToAdd: Item[] = [];
+    
+    if ((item.type === 'beam' || item.type === 'fascia') && item.dimensions[0] > 3) {
+      let remainingWidth = item.dimensions[0];
+      let processedWidth = 0;
+      const rotY = item.rotation?.[1] || 0;
+      const cos = Math.cos(rotY);
+      const sin = Math.sin(rotY);
+      
+      while (remainingWidth > 0) {
+        const chunkWidth = Math.min(3, remainingWidth);
+        const localCenterX = -item.dimensions[0] / 2 + processedWidth + chunkWidth / 2;
+        
+        const worldX = item.position[0] + localCenterX * cos;
+        const worldZ = item.position[2] - localCenterX * sin;
+        
+        itemsToAdd.push({
+          ...item,
+          id: uuidv4(),
+          position: [worldX, item.position[1], worldZ],
+          dimensions: [chunkWidth, item.dimensions[1], item.dimensions[2]]
+        });
+        
+        processedWidth += chunkWidth;
+        remainingWidth -= chunkWidth;
+        
+        if (remainingWidth > 0 && item.type === 'beam') {
+          const extLocalX = -item.dimensions[0] / 2 + processedWidth;
+          const extWorldX = item.position[0] + extLocalX * cos;
+          const extWorldZ = item.position[2] - extLocalX * sin;
+          
+          itemsToAdd.push({
+            id: uuidv4(),
+            type: 'extrusion',
+            position: [extWorldX, 1.2, extWorldZ],
+            rotation: [0, 0, 0],
+            dimensions: [0.04, 2.4, 0.04],
+            color: '#c0c0c0'
+          });
+        }
+      }
+    } else {
+      itemsToAdd.push({ ...item, id: uuidv4() });
+    }
+
+    const newItems = [...state.items, ...itemsToAdd];
     
     // Auto-add extrusions for sheets
     if (item.type === 'sheet') {
@@ -196,7 +297,7 @@ export const useBuilderStore = create<BuilderState>((set) => ({
         : [item.position[0] + width/2, 1.2, item.position[2]];
 
       const addExtrusionIfMissing = (pos: number[]) => {
-        const exists = state.items.some(i => 
+        const exists = newItems.some(i => 
           i.type === 'extrusion' && 
           Math.abs(i.position[0] - pos[0]) < 0.1 && 
           Math.abs(i.position[2] - pos[2]) < 0.1
@@ -223,7 +324,8 @@ export const useBuilderStore = create<BuilderState>((set) => ({
   }),
   addBooth: (width, depth, centerPos, rotationY) => set((state) => {
     const newItems = createBoothItems(width, depth, centerPos, rotationY);
-    const combinedItems = [...state.items, ...newItems];
+    const uniqueNewItems = deduplicateItems(state.items, newItems);
+    const combinedItems = [...state.items, ...uniqueNewItems];
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push(combinedItems);
     return { items: combinedItems, history: newHistory, historyIndex: newHistory.length - 1, placementMode: null };
@@ -245,19 +347,21 @@ export const useBuilderStore = create<BuilderState>((set) => ({
         for (let i = 0; i < count; i++) {
           const row = i % 2; // 0 for front, 1 for back
           const col = Math.floor(i / 2);
-          const x = startX + col * w + (col * 0.005); // offset to prevent z-fighting
-          const z = row === 0 ? d / 2 : -d / 2 - 0.005;
+          const x = startX + col * w;
+          const z = row === 0 ? d / 2 : -d / 2;
           const rotY = row === 0 ? 0 : Math.PI;
           newItems.push(...createBoothItems(w, d, [x, 0, z], rotY));
         }
       } else {
         const startX = -((count - 1) * w) / 2;
         for (let i = 0; i < count; i++) {
-          const x = startX + i * w + (i * 0.005);
+          const x = startX + i * w;
           newItems.push(...createBoothItems(w, d, [x, 0, 0], 0));
         }
       }
-      const combinedItems = [...state.items, ...newItems];
+      
+      const uniqueNewItems = deduplicateItems(state.items, newItems);
+      const combinedItems = [...state.items, ...uniqueNewItems];
       const newHistory = state.history.slice(0, state.historyIndex + 1);
       newHistory.push(combinedItems);
       return { items: combinedItems, history: newHistory, historyIndex: newHistory.length - 1 };

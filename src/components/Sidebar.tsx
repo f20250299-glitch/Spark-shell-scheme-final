@@ -15,12 +15,40 @@ export default function Sidebar() {
   const [customWidth, setCustomWidth] = useState('1');
   const [customHeight, setCustomHeight] = useState('2.4');
   const [customDepth, setCustomDepth] = useState('3');
+  const [showInventory, setShowInventory] = useState(false);
 
   const selectedItem = selectedItemIds.length === 1 ? items.find(i => i.id === selectedItemIds[0]) : null;
   const selectedPanels = items.filter(i => selectedItemIds.includes(i.id) && (i.type === 'sheet' || i.type === 'fascia' || i.type === 'counter-normal' || i.type === 'counter-glass'));
   const commonArtworkId = selectedPanels.length > 0 && selectedPanels.every(p => p.artworkId === selectedPanels[0].artworkId) 
     ? (selectedPanels[0].artworkId || '') 
     : '';
+
+  const calculateInventory = () => {
+    const inventory: Record<string, number> = {};
+    let carpetSqm = 0;
+
+    items.forEach(item => {
+      if (item.type === 'carpet') {
+        carpetSqm += item.dimensions[0] * item.dimensions[2];
+      } else {
+        let name = item.type.replace('-', ' ');
+        name = name.charAt(0).toUpperCase() + name.slice(1);
+        
+        // Add dimension details for specific items
+        if (item.type === 'beam' || item.type === 'fascia' || item.type === 'sheet' || item.type === 'extrusion') {
+          const length = item.type === 'extrusion' ? item.dimensions[1] : item.dimensions[0];
+          const formattedLength = Number.isInteger(length) ? length : length.toFixed(2).replace(/\.?0+$/, '');
+          name += ` (${formattedLength}m)`;
+        } else if (item.type === 'tv-stand') {
+          name += ` (${item.metadata?.tvSize || 50}")`;
+        }
+
+        inventory[name] = (inventory[name] || 0) + 1;
+      }
+    });
+
+    return { inventory, carpetSqm };
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -269,7 +297,52 @@ export default function Sidebar() {
             <input type="file" className="hidden" accept=".json" onChange={handleLoadProject} ref={fileInputRef} />
           </label>
         </div>
+        <button onClick={() => setShowInventory(true)} className="w-full mt-2 flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-2 rounded-lg transition-colors text-xs font-medium">
+          <Box size={14} /> View Inventory
+        </button>
       </div>
+
+      {showInventory && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">Project Inventory</h2>
+              <button onClick={() => setShowInventory(false)} className="text-gray-500 hover:text-gray-700">
+                &times;
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 rounded-tl-lg">Item</th>
+                    <th className="px-4 py-2 rounded-tr-lg text-right">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(calculateInventory().inventory).map(([name, count], i) => (
+                    <tr key={i} className="border-b border-gray-100 last:border-0">
+                      <td className="px-4 py-3 font-medium text-gray-900">{name}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{count}</td>
+                    </tr>
+                  ))}
+                  {calculateInventory().carpetSqm > 0 && (
+                    <tr className="border-b border-gray-100 last:border-0 bg-indigo-50/50">
+                      <td className="px-4 py-3 font-medium text-indigo-900">Carpet Area</td>
+                      <td className="px-4 py-3 text-right text-indigo-700 font-semibold">{calculateInventory().carpetSqm.toFixed(2)} sqm</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+              <button onClick={() => setShowInventory(false)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {placementMode && (
         <div className="p-4 bg-indigo-50 border-b border-indigo-200">
